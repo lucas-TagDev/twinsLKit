@@ -11,7 +11,7 @@ import {
   useTracks,
   useLocalParticipant,
 } from "@livekit/components-react";
-import { LocalAudioTrack, RemoteAudioTrack, RemoteParticipant, RoomEvent, Track, ScreenShareCaptureOptions } from "livekit-client";
+import { LocalAudioTrack, RemoteAudioTrack, RemoteParticipant, RoomEvent, Track, ScreenShareCaptureOptions, VideoQuality } from "livekit-client";
 import { ServerSound } from "@/lib/types";
 
 const ROOM_CONNECT_OPTIONS = { autoSubscribe: false };
@@ -307,6 +307,7 @@ function VoiceRoomContent({
   const [isAudioOnlySharing, setIsAudioOnlySharing] = useState(false);
   const [audioOnlyShareError, setAudioOnlyShareError] = useState<string | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [videoQualityByParticipant, setVideoQualityByParticipant] = useState<Record<string, VideoQuality>>({});
   const lastOutgoingSoundAtRef = useRef(0);
   const outgoingSoundCooldownByIdRef = useRef<Record<string, number>>({});
   const incomingSoundTimestampsByUserRef = useRef<Record<string, number[]>>({});
@@ -653,6 +654,29 @@ function VoiceRoomContent({
       room.localParticipant.off(RoomEvent.LocalTrackUnpublished, handleTrackUnpublished);
     };
   }, [room]);
+
+  const setVideoQuality = useCallback(async (participantId: string, quality: VideoQuality) => {
+    try {
+      const participant = remoteParticipants.find((p) => p.identity === participantId);
+      if (!participant) return;
+
+      // Atualiza qualidade para todas as publicações de vídeo do participante
+      const videoPublications = Array.from(participant.videoTrackPublications.values());
+      
+      for (const publication of videoPublications) {
+        if (publication.videoTrack) {
+          publication.setVideoQuality(quality);
+        }
+      }
+
+      setVideoQualityByParticipant((prev) => ({
+        ...prev,
+        [participantId]: quality,
+      }));
+    } catch (error) {
+      console.error("Erro ao alterar qualidade do vídeo:", error);
+    }
+  }, [remoteParticipants]);
 
   const maxTrimStartSeconds = useMemo(() => {
     if (!newSoundOriginalDuration || newSoundOriginalDuration <= newSoundTrimDurationSeconds) {
@@ -2186,6 +2210,21 @@ function VoiceRoomContent({
                     <p className="text-[11px] text-zinc-300 mt-1 truncate">
                       Assistindo: {watchers.map((viewer) => viewer.name).join(", ") || "ninguém"}
                     </p>
+
+                    {participantId !== localIdentity && card.trackRef && (
+                      <div className="mt-2 pt-2 border-t border-zinc-700/50">
+                        <label className="text-[10px] text-zinc-400 block mb-1">Qualidade do vídeo:</label>
+                        <select
+                          value={videoQualityByParticipant[participantId] ?? VideoQuality.HIGH}
+                          onChange={(e) => void setVideoQuality(participantId, Number(e.target.value) as VideoQuality)}
+                          className="w-full text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200"
+                        >
+                          <option value={VideoQuality.LOW}>Baixa (30 FPS, 320p)</option>
+                          <option value={VideoQuality.MEDIUM}>Média (30 FPS, 720p)</option>
+                          <option value={VideoQuality.HIGH}>Alta (60 FPS, 1080p+)</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-[10px] text-zinc-400 mt-2">Clique com botão direito para opções</p>
