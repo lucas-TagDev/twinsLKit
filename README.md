@@ -18,9 +18,11 @@ Plataforma de comunicação em tempo real inspirada em apps de comunidade: texto
 - Servidores com canais de texto e voz
 - Mensagens em canais e DM
 - Upload de arquivos e mídia
-- Moderação (ban, ações de voz, permissões)
+- Moderação (ban, ações de voz (expulsar, mover, silenciar, permissões)
 - Integração com LiveKit (voz/câmera/tela)
 - Proteção anti-bot no login/cadastro com Cloudflare Turnstile
+- Auditoria Logs
+- 
 
 ## 🧱 Stack
 
