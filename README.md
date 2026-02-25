@@ -92,14 +92,6 @@ Consulte o template completo em [.env.example](.env.example).
 - `npm run db:generate` — gera cliente Prisma
 - `npm run db:push` — sincroniza schema no banco
 
-## 🤝 Colaboração
-
-Fluxo recomendado para contribuição:
-
-- Repositório público
-- Contribuição via Pull Request
-- Branch `main` protegida
-- Revisão/aprovação antes de merge
 
 ## 📄 Licença
 
