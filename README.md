@@ -94,6 +94,3 @@ Consulte o template completo em [.env.example](.env.example).
 Este projeto usa licença customizada para uso pessoal e não comercial.
 Veja [LICENSE](LICENSE).
 
----
-
-> Nota sobre a logo: o README referencia `./public/logo.png`. Se o arquivo ainda não estiver no repositório, adicione a imagem nesse caminho para exibição automática.
