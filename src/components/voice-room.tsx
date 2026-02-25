@@ -540,7 +540,11 @@ function VoiceRoomContent({
 
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        audio: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
         video: true,
       });
 
