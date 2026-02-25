@@ -5,7 +5,7 @@
 <h1 align="center">TwinSLKit</h1>
 
 <p align="center">
-Plataforma de comunicação em tempo real inspirada em apps de comunidade: texto, voz, mídia e organização por servidores/canais.
+Plataforma de comunicação em tempo real inspirada em apps de comunidade: texto, voz, mídia e organização por servidores/canais como o Discord.
 </p>
 
 ## 📚 Documentação
