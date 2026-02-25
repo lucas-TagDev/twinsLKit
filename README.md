@@ -22,7 +22,7 @@ Plataforma de comunicação em tempo real inspirada em apps de comunidade: texto
 - Integração com LiveKit (voz/câmera/tela)
 - Proteção anti-bot no login/cadastro com Cloudflare Turnstile
 - Auditoria Logs
-- 
+- E muito mais...
 
 ## 🧱 Stack
 
