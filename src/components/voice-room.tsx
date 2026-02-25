@@ -199,6 +199,17 @@ export function VoiceRoom({
     [noiseSuppressionEnabled],
   );
 
+  const screenShareCaptureOptions = useMemo(
+    () => ({
+      video: {
+        frameRate: { ideal: 30, max: 60 },
+        width: { ideal: 1920, max: 3840 },
+        height: { ideal: 1080, max: 2160 },
+      },
+    }),
+    [],
+  );
+
   return (
     <div className="h-full min-h-[520px] rounded-md border border-zinc-700 overflow-hidden">
       <LiveKitRoom
@@ -207,6 +218,7 @@ export function VoiceRoom({
         connect
         video={joinWithCameraEnabled}
         audio={joinWithMicEnabled ? micCaptureOptions : false}
+        screen={screenShareCaptureOptions}
         connectOptions={ROOM_CONNECT_OPTIONS}
         onDisconnected={() => onLeave(token)}
         data-lk-theme="default"
