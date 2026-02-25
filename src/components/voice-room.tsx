@@ -307,7 +307,7 @@ function VoiceRoomContent({
   const [isAudioOnlySharing, setIsAudioOnlySharing] = useState(false);
   const [audioOnlyShareError, setAudioOnlyShareError] = useState<string | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [videoQualityByParticipant, setVideoQualityByParticipant] = useState<Record<string, VideoQuality>>({});
+  const [videoQualityByParticipant, setVideoQualityByParticipant] = useState<Record<string, VideoQuality | "auto">>({});
   const lastOutgoingSoundAtRef = useRef(0);
   const outgoingSoundCooldownByIdRef = useRef<Record<string, number>>({});
   const incomingSoundTimestampsByUserRef = useRef<Record<string, number[]>>({});
@@ -594,20 +594,31 @@ function VoiceRoomContent({
       return;
     }
 
-    try {
-      // Salva a função original
-      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
+    // Salva a função original
+    const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
 
+    try {
       // Sobrescreve temporariamente para adicionar constraints de alta qualidade
       navigator.mediaDevices.getDisplayMedia = function (constraints?: DisplayMediaStreamOptions): Promise<MediaStream> {
         const enhancedConstraints: DisplayMediaStreamOptions = {
           ...constraints,
-          video: constraints?.video === false ? false : {
-            ...(typeof constraints?.video === "object" ? constraints.video : {}),
-            frameRate: { ideal: 30, max: 60 },
-            width: { ideal: 1920, max: 3840 },
-            height: { ideal: 1080, max: 2160 },
-          },
+          audio:
+            constraints?.audio === false
+              ? false
+              : {
+                  ...(typeof constraints?.audio === "object" ? constraints.audio : {}),
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                },
+          video: constraints?.video === false
+            ? false
+            : {
+                ...(typeof constraints?.video === "object" ? constraints.video : {}),
+                frameRate: { ideal: 30, max: 60 },
+                width: { ideal: 1920, max: 3840 },
+                height: { ideal: 1080, max: 2160 },
+              },
         };
         return originalGetDisplayMedia.call(navigator.mediaDevices, enhancedConstraints);
       };
@@ -621,13 +632,12 @@ function VoiceRoomContent({
       };
 
       await room.localParticipant.setScreenShareEnabled(!isScreenSharing, screenShareOptions);
-      
-      // Restaura a função original
-      navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
-      
       setIsScreenSharing(!isScreenSharing);
     } catch (error) {
       console.error("Erro ao alternar compartilhamento de tela:", error);
+    } finally {
+      // Restaura a função original
+      navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
     }
   }, [room, isScreenSharing]);
 
@@ -655,7 +665,7 @@ function VoiceRoomContent({
     };
   }, [room]);
 
-  const setVideoQuality = useCallback(async (participantId: string, quality: VideoQuality) => {
+  const setVideoQuality = useCallback(async (participantId: string, quality: VideoQuality | "auto") => {
     try {
       const participant = remoteParticipants.find((p) => p.identity === participantId);
       if (!participant) return;
@@ -665,7 +675,14 @@ function VoiceRoomContent({
       
       for (const publication of videoPublications) {
         if (publication.videoTrack) {
-          publication.setVideoQuality(quality);
+          // "auto" deixa o LiveKit decidir baseado na conexão
+          if (quality === "auto") {
+            publication.setVideoQuality(VideoQuality.HIGH);
+            // Habilita simulcast adaptativo
+            publication.setEnabled(true);
+          } else {
+            publication.setVideoQuality(quality);
+          }
         }
       }
 
@@ -2215,13 +2232,21 @@ function VoiceRoomContent({
                       <div className="mt-2 pt-2 border-t border-zinc-700/50">
                         <label className="text-[10px] text-zinc-400 block mb-1">Qualidade do vídeo:</label>
                         <select
-                          value={videoQualityByParticipant[participantId] ?? VideoQuality.HIGH}
-                          onChange={(e) => void setVideoQuality(participantId, Number(e.target.value) as VideoQuality)}
+                          value={videoQualityByParticipant[participantId] ?? "auto"}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "auto") {
+                              void setVideoQuality(participantId, "auto");
+                            } else {
+                              void setVideoQuality(participantId, Number(value) as VideoQuality);
+                            }
+                          }}
                           className="w-full text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200"
                         >
-                          <option value={VideoQuality.LOW}>Baixa (30 FPS, 320p)</option>
-                          <option value={VideoQuality.MEDIUM}>Média (30 FPS, 720p)</option>
-                          <option value={VideoQuality.HIGH}>Alta (60 FPS, 1080p+)</option>
+                          <option value="auto">🔄 Automática (recomendado)</option>
+                          <option value={VideoQuality.LOW}>📱 Baixa (economiza dados)</option>
+                          <option value={VideoQuality.MEDIUM}>💻 Média (balanceada)</option>
+                          <option value={VideoQuality.HIGH}>🎬 Alta (máxima qualidade)</option>
                         </select>
                       </div>
                     )}
