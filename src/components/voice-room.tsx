@@ -9,9 +9,8 @@ import {
   useParticipants,
   useRoomContext,
   useTracks,
-  useLocalParticipant,
 } from "@livekit/components-react";
-import { LocalAudioTrack, RemoteAudioTrack, RemoteParticipant, RoomEvent, Track, ScreenShareCaptureOptions, VideoQuality } from "livekit-client";
+import { LocalAudioTrack, RemoteAudioTrack, RemoteParticipant, RoomEvent, Track } from "livekit-client";
 import { ServerSound } from "@/lib/types";
 
 const ROOM_CONNECT_OPTIONS = { autoSubscribe: false };
@@ -306,8 +305,6 @@ function VoiceRoomContent({
   const [localScreenShareAudioTrack, setLocalScreenShareAudioTrack] = useState<LocalAudioTrack | null>(null);
   const [isAudioOnlySharing, setIsAudioOnlySharing] = useState(false);
   const [audioOnlyShareError, setAudioOnlyShareError] = useState<string | null>(null);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [videoQualityByParticipant, setVideoQualityByParticipant] = useState<Record<string, VideoQuality | "auto">>({});
   const lastOutgoingSoundAtRef = useRef(0);
   const outgoingSoundCooldownByIdRef = useRef<Record<string, number>>({});
   const incomingSoundTimestampsByUserRef = useRef<Record<string, number[]>>({});
@@ -548,11 +545,7 @@ function VoiceRoomContent({
           noiseSuppression: false,
           autoGainControl: false,
         },
-        video: {
-          frameRate: { ideal: 30, max: 60 },
-          width: { ideal: 1920, max: 3840 },
-          height: { ideal: 1080, max: 2160 },
-        },
+        video: true,
       });
 
       const [audioTrack] = stream.getAudioTracks();
@@ -588,113 +581,6 @@ function VoiceRoomContent({
       setAudioOnlyShareError(message);
     }
   }, [room, stopAudioOnlyShare]);
-
-  const toggleScreenShare = useCallback(async () => {
-    if (room.state !== "connected") {
-      return;
-    }
-
-    // Salva a função original
-    const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
-
-    try {
-      // Sobrescreve temporariamente para adicionar constraints de alta qualidade
-      navigator.mediaDevices.getDisplayMedia = function (constraints?: DisplayMediaStreamOptions): Promise<MediaStream> {
-        const enhancedConstraints: DisplayMediaStreamOptions = {
-          ...constraints,
-          audio:
-            constraints?.audio === false
-              ? false
-              : {
-                  ...(typeof constraints?.audio === "object" ? constraints.audio : {}),
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false,
-                },
-          video: constraints?.video === false
-            ? false
-            : {
-                ...(typeof constraints?.video === "object" ? constraints.video : {}),
-                frameRate: { ideal: 30, max: 60 },
-                width: { ideal: 1920, max: 3840 },
-                height: { ideal: 1080, max: 2160 },
-              },
-        };
-        return originalGetDisplayMedia.call(navigator.mediaDevices, enhancedConstraints);
-      };
-
-      const screenShareOptions: ScreenShareCaptureOptions = {
-        audio: true,
-        video: true,
-        selfBrowserSurface: "exclude",
-        surfaceSwitching: "include",
-        systemAudio: "include",
-      };
-
-      await room.localParticipant.setScreenShareEnabled(!isScreenSharing, screenShareOptions);
-      setIsScreenSharing(!isScreenSharing);
-    } catch (error) {
-      console.error("Erro ao alternar compartilhamento de tela:", error);
-    } finally {
-      // Restaura a função original
-      navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
-    }
-  }, [room, isScreenSharing]);
-
-  useEffect(() => {
-    const handleTrackPublished = () => {
-      const hasScreenShare = !!Array.from(room.localParticipant.trackPublications.values()).find(
-        (pub) => pub.source === Track.Source.ScreenShare
-      );
-      setIsScreenSharing(hasScreenShare);
-    };
-
-    const handleTrackUnpublished = () => {
-      const hasScreenShare = !!Array.from(room.localParticipant.trackPublications.values()).find(
-        (pub) => pub.source === Track.Source.ScreenShare
-      );
-      setIsScreenSharing(hasScreenShare);
-    };
-
-    room.localParticipant.on(RoomEvent.LocalTrackPublished, handleTrackPublished);
-    room.localParticipant.on(RoomEvent.LocalTrackUnpublished, handleTrackUnpublished);
-
-    return () => {
-      room.localParticipant.off(RoomEvent.LocalTrackPublished, handleTrackPublished);
-      room.localParticipant.off(RoomEvent.LocalTrackUnpublished, handleTrackUnpublished);
-    };
-  }, [room]);
-
-  const setVideoQuality = useCallback(async (participantId: string, quality: VideoQuality | "auto") => {
-    try {
-      const participant = remoteParticipants.find((p) => p.identity === participantId);
-      if (!participant) return;
-
-      // Atualiza qualidade para todas as publicações de vídeo do participante
-      const videoPublications = Array.from(participant.videoTrackPublications.values());
-      
-      for (const publication of videoPublications) {
-        if (publication.videoTrack) {
-          // "auto" deixa o LiveKit decidir baseado na conexão
-          if (quality === "auto") {
-            publication.setVideoQuality(VideoQuality.HIGH);
-            // Habilita simulcast adaptativo
-            publication.setEnabled(true);
-          } else {
-            publication.setVideoQuality(quality);
-          }
-        }
-      }
-
-      setVideoQualityByParticipant((prev) => ({
-        ...prev,
-        [participantId]: quality,
-      }));
-    } catch (error) {
-      console.error("Erro ao alterar qualidade do vídeo:", error);
-    }
-  }, [remoteParticipants]);
-
   const maxTrimStartSeconds = useMemo(() => {
     if (!newSoundOriginalDuration || newSoundOriginalDuration <= newSoundTrimDurationSeconds) {
       return 0;
@@ -2227,29 +2113,6 @@ function VoiceRoomContent({
                     <p className="text-[11px] text-zinc-300 mt-1 truncate">
                       Assistindo: {watchers.map((viewer) => viewer.name).join(", ") || "ninguém"}
                     </p>
-
-                    {participantId !== localIdentity && card.trackRef && (
-                      <div className="mt-2 pt-2 border-t border-zinc-700/50">
-                        <label className="text-[10px] text-zinc-400 block mb-1">Qualidade do vídeo:</label>
-                        <select
-                          value={videoQualityByParticipant[participantId] ?? "auto"}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === "auto") {
-                              void setVideoQuality(participantId, "auto");
-                            } else {
-                              void setVideoQuality(participantId, Number(value) as VideoQuality);
-                            }
-                          }}
-                          className="w-full text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200"
-                        >
-                          <option value="auto">🔄 Automática (recomendado)</option>
-                          <option value={VideoQuality.LOW}>📱 Baixa (economiza dados)</option>
-                          <option value={VideoQuality.MEDIUM}>💻 Média (balanceada)</option>
-                          <option value={VideoQuality.HIGH}>🎬 Alta (máxima qualidade)</option>
-                        </select>
-                      </div>
-                    )}
                   </div>
 
                   <p className="text-[10px] text-zinc-400 mt-2">Clique com botão direito para opções</p>
@@ -2307,21 +2170,7 @@ function VoiceRoomContent({
         </div>
 
         <div className="border-t border-zinc-800 p-2">
-          <div className="flex items-center gap-2">
-            <ControlBar />
-            <button
-              type="button"
-              onClick={() => void toggleScreenShare()}
-              title={isScreenSharing ? "Parar compartilhamento de tela" : "Compartilhar tela em alta qualidade"}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isScreenSharing
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
-            >
-              {isScreenSharing ? "🛑 Parar Tela" : "📺 Compartilhar Tela"}
-            </button>
-          </div>
+          <ControlBar />
 
           <div className="mt-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
             <label className="flex items-center gap-2 text-xs text-zinc-200">
