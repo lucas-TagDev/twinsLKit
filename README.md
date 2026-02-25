@@ -10,12 +10,8 @@ Plataforma de comunicação em tempo real inspirada em apps de comunidade: texto
 
 ## 📚 Documentação
 
-- Documentação oficial (Notion):
+- Documentação para deploy:
   - https://liberating-flyaway-665.notion.site/TwinSLKit-Documentation-311fc24db26d8030bf94e08e30f1e432?pvs=74a
-- Deploy VPS (local):
-  - [DEPLOY.md](DEPLOY.md)
-- Cloudflare Turnstile (local):
-  - [TURNSTILE.md](TURNSTILE.md)
 
 ## ✨ Funcionalidades
 
